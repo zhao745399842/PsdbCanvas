@@ -1,2 +1,2 @@
 # PsdbCanvas
-Used to draw the grid or other types of topology.
+基于CreateJs封装的一套用于绘制电网网架拓扑图的canvas绘图框架。
