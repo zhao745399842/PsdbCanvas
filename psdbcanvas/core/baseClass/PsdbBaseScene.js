@@ -47,6 +47,10 @@ this.PsdbCanvas = this.PsdbCanvas||{};
          */
         this.nodeEdit=true;
         /**
+         * 场景中的节点或通道是否可编辑
+         */
+        this.editAble=true;
+        /**
          * 当前是否为画线模式，true表示是
          * @type {boolean}
          */
@@ -55,7 +59,13 @@ this.PsdbCanvas = this.PsdbCanvas||{};
          * 单选和多选，值为true表示表示单选模式，值为false表示未多选模式
          * @type {boolean}
          */
-        this.selectSingle=true;
+        this.selectSingle=false;
+        /**
+         * 坐标类型。设置坐标类型是像素坐标还是经纬度坐标。默认是像素坐标.
+         * PIXEL:像素坐标
+         * LONLAT：经纬度坐标
+         */
+        this.csysType = 'PIXEL',//LONLAT
 
         /**
          * 初始化场景
@@ -66,6 +76,9 @@ this.PsdbCanvas = this.PsdbCanvas||{};
 
     //指定类的继承关系
     var p = createjs.extend(PsdbBaseScene, PsdbCanvas.PsdbContainer);
+    
+    PsdbBaseScene._MOUSE_EVENTS = ["beforemousedown","aftermousedown","drawchnnel"];
+    
     /**
      * 初始化场景
      */
@@ -77,8 +90,18 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         me.channels=new Array();
         //存储当前容器中存放的节点
         me.nodes=new Array();
+        //存储线路断面
+        me.sections=new Array();
+        
+        me.nodeItems= new PsdbCanvas.PsdbContainer();
+        me.channelItems= new PsdbCanvas.PsdbContainer();
+        me.sectionItems=new PsdbCanvas.PsdbContainer();
         //存放场景中节点和连线
         me.items= new PsdbCanvas.PsdbContainer();
+        me.items.addChild(me.channelItems);
+        me.items.addChild(me.nodeItems);
+        me.items.addChild(me.sectionItems);
+
         //存放临时对象，例如手动绘制节点连线时的动态路径线
         me.tempContainer=new PsdbCanvas.PsdbContainer();
         //存放背景
@@ -107,6 +130,19 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         }
         me.setBackgroundColor(me.backgroundColor);
         me.backgroundContainer.addChild(me.bg);
+    };
+    /**
+     * 获取场景编辑状态
+     */
+    p.getEditAble=function(){
+    	return this.editAble;
+    };
+    /**
+     * 设置场景编辑状态
+     */
+    p.setEditAble=function(editAble){
+    	var me=this;
+        me.editAble=editAble;
     };
     /**
      * 设置当前模式是否为画线模式
@@ -154,6 +190,25 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         me.bg.graphics.endFill();
     };
     /**
+     * 设置坐标类型。设置坐标类型是像素坐标还是经纬度坐标。默认是像素坐标.
+     * @param type ：PIXEL:像素坐标，LONLAT：经纬度坐标
+     */
+    p.setCsysType = function(type){
+        var me=this;
+        me.csysType=type;
+    };
+    /**
+     * 判断是否为经纬度坐标类型
+     * @returns {boolean}
+     */
+    p.isLonlatCsysType=function(){
+        var me=this;
+        if(me.csysType=="LONLAT"){
+            return true;
+        }
+        return false;
+    };
+    /**
      * 设置场景大小
      * @param width
      * @param height
@@ -175,10 +230,12 @@ this.PsdbCanvas = this.PsdbCanvas||{};
                 node.scene=me;
                 node.editable=me.nodeEdit;
                 me.nodes.push(node);
-                me.addSceneChild(node);
+                //if(node.getVisible()){
+            	me.addSceneChild(node);
                 node.initNodeEvent();
-                node.load();
-                me.updateScene();
+            	node.load();	
+                //}
+                //me.updateScene();
             };
             //判断当前节点是否接收的图片
             if(node.showImage){
@@ -214,9 +271,28 @@ this.PsdbCanvas = this.PsdbCanvas||{};
             me.channels.push(channel);
             me.addSceneChild(channel);
             //me.setLineIndex(line);
-            me.updateScene();
+            //me.updateScene();
         }
 
+    };
+    /**
+     * 添加线路断面
+     */
+    p.addSection = function(section){
+    	var me=this;
+        if(!section){
+            return;
+        }
+        if(section instanceof PsdbCanvas.PsdbLineSection){
+        	section.scene=me;
+            me.sections.push(section);
+            me.addSceneChild(section);
+            section.load();
+        }
+
+    };
+    p.getSections = function(){
+    	return this.sections;
     };
     /**
      * 获取场景中所有通道
@@ -251,11 +327,20 @@ this.PsdbCanvas = this.PsdbCanvas||{};
     p.addSceneChild=function(child){
         var me=this,
             nodes=me.nodes,
-            channels=me.channels;
-        if(!child||!child.container){
+            channels=me.channels,
+            nodeItems=me.nodeItems,
+            channelItems=me.channelItems;
+        if(!child){
             return;
         }
-        me.items.addChild(child.container);
+        if(child instanceof PsdbCanvas.PsdbNode){
+        	me.nodeItems.addChild(child.container);
+        }else if(child instanceof PsdbCanvas.PsdbChannel){
+        	me.channelItems.addChild(child.container);
+        }else if(child instanceof PsdbCanvas.PsdbLineSection){
+        	me.sectionItems.addChild(child);
+        }
+       /* me.items.addChild(child.container);
         var index=0;
         if(channels){
             //设置线条的存放位置
@@ -269,7 +354,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
                 me.items.setChildIndex(nodes[i].container,index);
                 index++;
             }
-        }
+        }*/
 
     };
 
@@ -291,68 +376,133 @@ this.PsdbCanvas = this.PsdbCanvas||{};
     };
     /**
      * 更新场景
+     * item ：node或者channel
+     * unreload ：true表示不重新加载场景中的内容，只刷新场景中元素的属性状态
+     *            false：如果item不为空，刷新item以及相连的通道，如果item为空重新加载场景中的所有元素并刷新元素的状态。
      */
-    p.updateScene=function(){
+    p.updateScene=function(item,unreload){
         var me=this,
             channels=me.channels,
             nodes=me.nodes;
         if(!me.currentStage||!nodes){
             return;
         }
-        var drawLine=function(thiz,evt){
-            if(!channels){
-                return;
-            }
-            for(var i=0;i<channels.length;i++){
-                channels[i].load();
-            }
-        };
-
-        for(var i=0;i<channels.length;i++){
-            channels[i].load();
+        
+        if(unreload){
+        	me.currentStage.updateStage();
+        	return;
         }
-        for(var n=0;n<nodes.length;n++){
-            nodes[n].pressMoveHandler=drawLine;
+        
+        if(item&&item instanceof PsdbCanvas.PsdbNode){
+        	var nodeChannels=item.channels;
+        	item.refresh();
+        	for(var i=0;i<nodeChannels.length;i++){
+        		nodeChannels[i].refresh();
+        		nodeChannels[i].load();
+            }
+            me.currentStage.updateStage();
+            return;
+        }
+        if(item&&item instanceof PsdbCanvas.PsdbChannel){
+        	item.refresh();
+        	item.load();
+            me.currentStage.updateStage();
+            return;
+        }
+        
+        if(me.isLonlatCsysType()){
+            for(var n=0;n<nodes.length;n++){
+                nodes[n].refresh();
+                // nodes[n].pressMoveHandler=drawLine;
+            }
+        }
+        for(var i=0;i<channels.length;i++){
+        	var channel=channels[i];
+        	if(channel.getVisible()){
+        		
+        		/*channel.nodeA.refresh();
+        		channel.nodeB.refresh();*/
+        		
+        		channel.refresh();
+            	channel.load();
+        	}
         }
         me.currentStage.updateStage();
     };
+    /**
+     * 移除指定的通道或者节点
+     */
     p.removeChild = function(n){
         var me=this,
             channels=me.channels,
-            nodes=me.nodes;
+            nodes=me.nodes,
+            sections=me.sections;
         if(!n){
             return;
         }
-        var removeByValue=function(arr, val) {
-            for(var i=0; i<arr.length; i++) {
-                if(arr[i] == val) {
-                    arr.splice(i, 1);
-                    break;
-                }
-            }
-        };
         if(n instanceof PsdbCanvas.PsdbNode){
-            removeByValue(nodes,n);
+        	PsdbCanvas.removeArrayValue(nodes,n);
+        	for(var l= 0;l<channels.length;l++){
+                 var line=channels[l];
+                 if((line.nodeA&&line.nodeA==n)||(line.nodeB&&line.nodeB==n)){
+                	 PsdbCanvas.removeArrayValue(channels,line);
+                	 me.items.removeChild(line.container);
+                     l--;
+                 }
+            }
+        	me.nodeItems.removeChild(n.container);
         }
+        //删除通道
         if(n instanceof PsdbCanvas.PsdbChannel){
-            removeByValue(channels,n);
+        	n.nodeA.removeChannel(n);
+        	n.nodeB.removeChannel(n);
+        	PsdbCanvas.removeArrayValue(channels,n);
+        	
+        	me.channelItems.removeChild(n.container);
         }
-        me.items.removeChild(n.container);
+        //删除断面
+        if(n instanceof PsdbCanvas.PsdbChannel){
+        	PsdbCanvas.removeArrayValue(sections,n);
+        	me.sectionItems.removeChild(n);
+        }
+        
+        //删除节点的同事删除选中集合中的节点
+        //PsdbCanvas.removeArrayValue(me.selectsChild,n);
+        //me.items.removeChild(n.container);
     };
     /**
      * 移除所有的节点和通道
      */
-    p.removeAllChild = function(){
+    p.removeAllChilds = function(){
     	var me=this;
-    	me.items.removeAllChildren();
+    	//me.items.removeAllChildren();
+    	me.nodeItems.removeAllChildren();
+        me.channelItems.removeAllChildren();
+        me.sectionItems.removeAllChildren();
     	me.channels=new Array();
     	me.nodes=new Array();
-    	me.updateScene();
+    	me.sections=new Array();
+    	me.selectsChild=new Array();
+    };
+    /**
+     * 移除所有选中的节点
+     */
+    p.removeSelectChilds = function(){
+    	var me=this,
+		    selects=me.getSelectsChild();
+		if(!selects||selects.length<1){
+			return;
+		}
+	    for(var i=0,len=selects.length;i<len;i++){
+	    	var child=selects[i];
+	    	me.removeChild(child);
+	    }
+	    me.selectsChild=new Array();
     };
     /**
      * 删除选中节点，同时删除与该节点相连的线条
      * @param
-     */
+     *//*
     p.deleteNodes = function(){
         var me=this,
             channels=me.channels,
@@ -376,13 +526,13 @@ this.PsdbCanvas = this.PsdbCanvas||{};
             me.items.removeChild(n.container);
             i--;
         }
-        me.updateScene();
-    };
+        //me.updateScene();
+    };*/
 
     /**
      * 删除线条
      * @param l
-     */
+     *//*
     p.deleteLine = function(l){
         var me=this;
         if(!l){
@@ -394,15 +544,19 @@ this.PsdbCanvas = this.PsdbCanvas||{};
 
     /**
      * 将选中的节点或连线添加到selectsChild中
-     * @param n
+     * @param n 需要添加的节点
+     * @param selectSingle 是否只添加一个，值为true表示只选择一个
+     * @existUnselect 存在是否要取消选中
      */
-    p.addselectsChild = function(n){
+    p.addselectsChild = function(n,selectSingle,existUnselect){
         var me=this,
             selects=me.selectsChild;
-        if(me.selectSingle){
+        if(selectSingle){
             me.clearSelects(n);
             selects.length=0;
             selects.push(n);
+            n.addSelectedStyle();
+            n.isSelected=true;	
         }else{
             var flg=true;
             for(var i= 0,len=selects.length;i<len;i++){
@@ -413,9 +567,17 @@ this.PsdbCanvas = this.PsdbCanvas||{};
             }
             if(flg){
                 selects.push(n);
+                n.addSelectedStyle();
+                n.isSelected=true;
+            }else{
+            	if(existUnselect){
+            		me.clearItemSelect(n);
+            	}
             }
         }
     };
+
+
 
     /**
      * 获取选中的节点或线路
@@ -425,8 +587,34 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         return this.selectsChild;
     };
     /**
-     * 清除选中项目
-     * @param n
+     * 清除传入节点或通道的选中状态
+     */
+    p.clearItemSelect = function(n){
+    	var me=this;
+    	
+    	if(n&&n instanceof PsdbCanvas.PsdbNode){
+             n.clearSelectedStyle();
+             PsdbCanvas.removeArrayValue(me.selectsChild,n);
+             n.isSelected=false;
+    	}else if(n&&n instanceof PsdbCanvas.PsdbChannel){
+            n.clearSelectedStyle();
+            PsdbCanvas.removeArrayValue(me.selectsChild,n);
+            n.isSelected=false;
+    	}
+    };
+    /**
+     * 清除所有选中节点的选中状态
+     */
+    p.clearAllSelect = function(){
+    	var me=this,
+    	    selects=me.getSelectsChild();
+    	for(var i=0,len=selects.length;i<len;i++){
+    		me.clearItemSelect(selects[i]);
+    	}
+    },
+    /**
+     * 清除除指定选中项外其它选中项目
+     * @param n 指定选中项
      */
     p.clearSelects = function(n){
         var me=this,
@@ -436,8 +624,9 @@ this.PsdbCanvas = this.PsdbCanvas||{};
             for(var i=0;i<channels.length;i++){
                 var channel=channels[i];
                 if(n.id!=channel.id){
-                    channel.isSelected=false;
-                    channel.clearSelectedStyle();
+//                    channel.isSelected=false;
+//                    channel.clearSelectedStyle();
+                	me.clearItemSelect(channel);
                 }
             }
         }
@@ -445,13 +634,15 @@ this.PsdbCanvas = this.PsdbCanvas||{};
             for(var i=0;i<nodes.length;i++){
                 var node=nodes[i];
                 if(n.id!=node.id){
-                    node.isSelected=false;
+                    /*node.isSelected=false;
                     node.selectShape.alpha=0;
-                    node.removeAnchorPoint();
+                    node.removeAnchorPoint();*/
+                	me.clearItemSelect(node);
                 }
             }
+            //me.selectsChild.length=0;
         }
-        me.updateScene();
+        me.updateScene(null,true);
     };
     p.pushLinkNodes = function(node){
         var me=this,
@@ -489,18 +680,23 @@ this.PsdbCanvas = this.PsdbCanvas||{};
     p.createNodeslink = function(){
         var me=this,
             nodes=me.linkNodes;
+        if(!me.drawLineModel){
+        	return;
+        }
+        
         me.tempContainer.removeAllChildren();
         if(nodes.length!=2||!me.drawLineModel){
             me.clearLinkNodes();
-            me.updateScene();
+            me.updateScene(null,true);
             return;
         }
-        var channel=new PsdbCanvas.StraightChannel(nodes[0],nodes[1]);
+        me.dispatchEvent({type:"drawchnnel",scene:me,nodeA:nodes[0],nodeB:nodes[1]});
+       // me.dispatchEvent({type:"drawchnnel",nodeObj:{scene:me,nodeA:nodes[0],nodeB:nodes[1]}});
+        /*var channel=new PsdbCanvas.StraightChannel(nodes[0],nodes[1]);
         var line=new PsdbCanvas.PsdbLine(nodes[0],nodes[1]);
         line.setStrokColor("#0b56e0");
-
         channel.add(line);
-        me.addChannel(channel);
+        me.addChannel(channel);*/
         me.clearLinkNodes();
 
     };
@@ -529,28 +725,72 @@ this.PsdbCanvas = this.PsdbCanvas||{};
     p.drawNodePathLine = function(node,x,y){
         var me=this,
             scale=me.scale;
+        
         var linkShape= new PsdbCanvas.PsdbShape(this);
         linkShape.graphics.clear();
         linkShape.graphics.beginStroke("#878787");
         linkShape.graphics.moveTo(node.x*scale,node.y*scale);
-        linkShape.graphics.lineTo((x*scale-me.x),(y*scale-me.y));
+        
+        var r=10,x1=node.x*scale,y1=node.y*scale,
+            x2=x-me.x,y2=y-me.y,x3=0,y3=0;
+        var d=Math.abs(Math.sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2)));
+        if(d<r){
+        	r=d*0.5;
+        }
+        if(d!=0){
+        	y3=y1+((y2-y1)/d)*(d-r);
+            x3=x1+((x2-x1)/d)*(d-r);
+        }
+        linkShape.graphics.lineTo(x3,y3);
         linkShape.graphics.endStroke();
         me.tempContainer.addChild(linkShape);
+    };
+    /**
+     * 绘制选择区域
+     * @param x 选择区域的起始x坐标值
+     * @param y 选择区域的起始y坐标值
+     * @returns {{x: number, y: number, w: number, h: number}}
+     */
+    p.drawSelectArea = function(x,y){
+        var me=this,
+            scale=me.scale,
+            md_x=me.md_x,
+            md_y=me.md_y,
+            w=x-md_x,
+            h=y-md_y;
+        me.tempContainer.removeAllChildren();
+        var selectAreaShape= new PsdbCanvas.PsdbShape(this);
+        selectAreaShape.alpha=0.3;
+        selectAreaShape.graphics.clear();
+        selectAreaShape.graphics.beginFill("#878787");
+
+        selectAreaShape.graphics.drawRect(md_x,md_y,w,h);
+        selectAreaShape.graphics.endFill();
+        me.tempContainer.addChild(selectAreaShape);
+        return {
+            x :md_x,
+            y :md_y,
+            w :w,
+            h :h
+        };
     };
 
 
     p.initSceneEvent = function(){
         var me=this,
-            scale=me.scale,
             bg=me.backgroundContainer;
         me.addEventListener("mousedown", function (evt) {
             me.dispatchEvent({type:"beforemousedown",evt:evt,nativeEvent:e});
-            //定义鼠标右键事件
             var e=evt.nativeEvent;
-            var o = me;
-            o.offset = {x: o.x - evt.stageX * scale, y: o.y - evt.stageY * scale};
-            if(!evt.target.owerCt||!evt.target.owerCt.isSelected){
-                me.clearSelects(me);
+            me.offset = {x:me.x - evt.stageX, y:me.y - evt.stageY};
+            me.md_x=evt.stageX-me.x,
+            me.md_y=evt.stageY-me.y;
+            //定义鼠标右键事件
+            if (e.button==0){
+            	//鼠标左键的时候清除选中状态
+            	if(!evt.target.owerCt||!evt.target.owerCt.isSelected){
+                    me.clearSelects(me);
+                }
             }
             me.dispatchEvent({type:"aftermousedown",evt:evt,nativeEvent:e});
             evt.stopPropagation();
@@ -562,13 +802,51 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         me.addEventListener("pressmove", function (evt) {
             var e=evt.nativeEvent;
             if (e.button==0){
-                var o = me;
-                //计算当前移动的偏移量
-                o.x = (evt.stageX*scale+ o.offset.x);
-                o.y = (evt.stageY*scale + o.offset.y);
-                bg.x=-o.x;
-                bg.y=-o.y;
+                if(e.shiftKey){ //e.shiftKey=true按下shift键盘
+           		    me.selectAreaObj=me.drawSelectArea(evt.stageX-me.x,evt.stageY-me.y);
+           		    //地图中添加
+                    e.stopPropagation();
+           	    }else{
+           	        //计算当前移动的偏移量
+                    me.x =evt.stageX+ me.offset.x;
+                    me.y =evt.stageY+ me.offset.y;
+                    bg.x=-me.x;
+                    bg.y=-me.y;
+           	    }
+                if(!me.isLonlatCsysType()){
+                	 me.updateScene();
+                }
+            }
+            evt.stopPropagation();
+        });
+        me.addEventListener("pressup", function (evt) {
+        	evt.preventDefault();
+            var e=evt.nativeEvent;
+            //e.shiftKey=true按下shift键盘
+            if(e.button==0&&me.selectAreaObj){
+            	evt.preventDefault();
+                var nodes=me.nodes,
+                    w_x=me.selectAreaObj.x+ me.selectAreaObj.w,
+                    h_y=me.selectAreaObj.y+ me.selectAreaObj.h;
+                if(!me.selectAreaObj){
+                    return;
+                }
+                for(var i= 0,len=nodes.length;i<len;i++){
+                    var node=nodes[i],
+                        nx=node.x*me.scale,
+                        ny=node.y*me.scale;
+                    if(nx<w_x&&nx>me.selectAreaObj.x&&
+                        ny<h_y&&ny>me.selectAreaObj.y){
+                        me.addselectsChild(node);
+                        node.addSelectedStyle();
+                    }
+                }
+               // alert(me.selectsChild.length);
+                me.selectAreaObj=null;
+                me.tempContainer.removeAllChildren();
                 me.updateScene();
+              //地图中添加
+                e.stopPropagation();
             }
             evt.stopPropagation();
         });

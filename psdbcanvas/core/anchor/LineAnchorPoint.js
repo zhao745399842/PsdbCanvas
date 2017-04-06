@@ -47,7 +47,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
          */
         this.anchaY=y;
 
-
+        this.initLineAnchorPoint();
         this.initAnchorEvent();
     }
 
@@ -57,14 +57,56 @@ this.PsdbCanvas = this.PsdbCanvas||{};
 
     p.initLineAnchorPoint = function(){
         var me=this;
-        /**
-         *
-         * @type {null}
-         */
-        me.anchorShape=null;
-
+        me.refreshLonLat();
     };
-
+    p.setLocation=function(x,y){
+        var me=this;
+        //指定坐标
+        me.anchaX=x;
+        me.anchaY=y;
+        me.initX= me.anchaX;
+        me.initY= me.anchaY;
+    };
+    /**
+     * 设置经纬度坐标.
+     * 地图中使用
+     */
+    p.setLonLatLocation=function(x,y){
+        var me=this,
+            scene=me.channel.scene;
+        if(scene&&scene.isLonlatCsysType()){
+            me.lon=x;
+            me.lat=y;
+            var point=PsdbCanvas.lonLatToPixel(x,y);
+            me.setLocation(point.x,point.y);
+            return;
+        }
+        me.setLocation(x,y);
+    };
+    p.refresh = function(){
+        var me=this,
+            scene=me.channel.scene,
+            o=me;
+        if(scene&&scene.isLonlatCsysType()){
+            var point=PsdbCanvas.lonLatToPixel(me.lon,me.lat);
+            me.anchaX=point.x;
+            me.anchaY=point.y;
+            o.x=me.anchaX-me.initX;
+            o.y=me.anchaY-me.initY;
+        }
+    };
+    /**
+     * 刷新当前坐标对应的经纬度
+     */
+    p.refreshLonLat = function(){
+        var me=this,
+            scene=me.channel.scene;
+        if(scene&&scene.isLonlatCsysType()){
+            var lonlat=PsdbCanvas.pixelTolonLat(me.anchaX,me.anchaY);
+            me.lon=lonlat.x;
+            me.lat=lonlat.y;
+        }
+    };
     /**
      * 绘制节点的描点
      */
@@ -124,6 +166,8 @@ this.PsdbCanvas = this.PsdbCanvas||{};
                 scale=1/scene.scale;
             o.offset = {x: o.x - evt.stageX*scale, y: o.y - evt.stageY*scale};
             evt.stopPropagation();
+            //超图中添加
+            evt.nativeEvent.stopPropagation();
         });
         /**
          * 鼠标按下移动事件
@@ -133,19 +177,31 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         me.addEventListener("pressmove", function (evt) {
             var o = me,
                 scale=1/scene.scale;
-            //计算当前移动的偏移量
-            o.x = (evt.stageX*scale + o.offset.x);
-            o.y = (evt.stageY*scale + o.offset.y);
-            me.anchaX= o.x+me.initX;
-            me.anchaY= o.y+me.initY;
-            scene.updateScene();
+            if(scene.getEditAble()){
+            	//计算当前移动的偏移量
+                o.x = (evt.stageX*scale + o.offset.x);
+                o.y = (evt.stageY*scale + o.offset.y);
+                me.anchaX= o.x+me.initX;
+                me.anchaY= o.y+me.initY;
+                me.refreshLonLat();
+                scene.updateScene(me.channel);
+                
+                me.channel.dispatchEvent({type:"anchorchange",evt:evt,nativeEvent:evt.nativeEvent});
+            }
             evt.stopPropagation();
         });
         me.addEventListener("dblclick", function (evt) {
-            var pointContainer=me.channel.anchorPointContainer;
-            pointContainer.removeChild(me);
-            scene.updateScene();
-            evt.stopPropagation();
+        	if(scene.getEditAble()){
+        		var pointContainer=me.channel.anchorPointContainer;
+                pointContainer.removeChild(me);
+                scene.updateScene(me.channel);
+                
+                me.channel.dispatchEvent({type:"anchorchange",evt:evt,nativeEvent:evt.nativeEvent});
+                
+                evt.stopPropagation();
+        	}
+          //超图中添加
+            evt.nativeEvent.stopPropagation();
         });
     };
     //添加前缀创，创建父类的构造函数Stage_constructor

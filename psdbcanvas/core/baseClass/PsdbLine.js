@@ -22,6 +22,11 @@ this.PsdbCanvas = this.PsdbCanvas||{};
          */
         this.id=null;
         /**
+         * 线路id在一个场景中唯一
+         */
+       
+        this.lineId="";
+        /**
          * 线条名
          * @type {string}
          */
@@ -30,7 +35,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
          * 线宽
          * @type {number}
          */
-        this.lineWidth = 2; // 线宽
+        this.lineWidth = 0.9; // 线宽
         /**
          * 是否为虚线模式
          */
@@ -44,7 +49,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
          * 线条之间的间隔
          * @type {number}
          */
-        this.bundleGap = 6;
+        this.bundleGap = 4;
         /**
          *  文本偏移量（向下3个像素）
          * @type {number}
@@ -80,6 +85,10 @@ this.PsdbCanvas = this.PsdbCanvas||{};
          * @type {boolean}
          */
         this.editable=true;
+        /**
+         * 标记是否显示
+         */
+        this.visible=true;
 
         this.initPsdbLine();
     }
@@ -153,7 +162,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         var x=linePath[0].x+(linePath[3].x/2-linePath[0].x/2);
         var y=linePath[0].y+(linePath[3].y/2-linePath[0].y/2);
         //me.setTextLocation(x,y);
-
+        //shape.shadow=new createjs.Shadow("#000000", 5, 5, 10);
         shape.graphics.moveTo(linePath[0].x,linePath[0].y);
         for(var i=1;i<linePath.length-1;i++){
             shape.graphics.lineTo(linePath[i].x,linePath[i].y);
@@ -195,7 +204,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
 
         //如果虚线模式为true则采用虚线模式
         if(me.dashedPattern){
-            shape.graphics.setStrokeDash([20, 10], 0);
+            shape.graphics.setStrokeDash([6, 6], 0);
         }
         shape.graphics.beginStroke(me.strokeColor);
         shape.graphics.setStrokeStyle(me.lineWidth);
@@ -204,7 +213,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         return shape;
     };
 
-
+   
     /**
      * 加载线条
      */
@@ -255,6 +264,21 @@ this.PsdbCanvas = this.PsdbCanvas||{};
     p.setDashedPattern=function(v){
         this.dashedPattern=v;
     };
+    /**
+     * 设置线路是否显示
+     */
+    p.setVisible=function(visible){
+    	var me=this;
+    	me.visible=visible;
+    	me.container.visible=visible;
+    };
+    /**
+     * 获取线路的显示状态
+     */
+    p.getVisible=function(){
+    	var me=this;
+    	return me.visible;
+    },
     /**
      * 初始化事件
      * @param stage  舞台对象

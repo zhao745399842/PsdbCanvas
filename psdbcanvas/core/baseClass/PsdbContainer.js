@@ -79,6 +79,13 @@ this.PsdbCanvas = this.PsdbCanvas||{};
         me.initX= me.x;
         me.initY= me.y;
     };
+    /**
+     * 设置容器是否显示
+     */
+    p.setVisible=function(visible){
+    	var me=this;
+    	me.visible=visible;
+    };
     //添加前缀创，创建父类的构造函数Container_constructor
     PsdbCanvas.PsdbContainer = createjs.promote(PsdbContainer, "Container");
 })();

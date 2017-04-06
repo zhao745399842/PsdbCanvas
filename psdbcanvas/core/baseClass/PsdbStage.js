@@ -29,7 +29,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
 
         this.Stage_constructor(canvas);
 
-        this.enableMouseOver(10);
+        this.enableMouseOver(5);
 
         /**
          * 值为true是表示当鼠标离开画布是鼠标移动事件继续进行
@@ -55,7 +55,14 @@ this.PsdbCanvas = this.PsdbCanvas||{};
     }
     //指定类的继承关系
     var p = createjs.extend(PsdbStage, createjs.Stage);
-
+    /**
+     * 设置舞台超图对象
+     */
+    p.setSuperMap=function(map){
+        if(map){
+            PsdbCanvas.setSuperMap(map);
+        }
+    };
     /**
      * 刷新舞台
      */
@@ -68,9 +75,11 @@ this.PsdbCanvas = this.PsdbCanvas||{};
      */
     p.initObjectEvent=function(stage){
         var me=this;
+        
+        //createjs.Ticker.setFPS(50);
+        //createjs.Ticker.framerate= 0;
+        //createjs.Ticker.addEventListener("tick", me);
 
-        createjs.Ticker.setFPS(20);
-        createjs.Ticker.addEventListener("tick", me);
         /*me.addEventListener("mouseenter", function (evt) {
             //鼠标进入之前
             me.dispatchEvent ("beforemouseenter");
@@ -81,8 +90,11 @@ this.PsdbCanvas = this.PsdbCanvas||{};
        /* me.addEventListener("aftermouseenter", function (evt) {
             alert("你好@@@");
         });*/
-
-
+        /*var updateStage=function(){
+        	me.updateStage();
+        	window.requestAnimationFrame(updateStage);
+        };
+        window.requestAnimationFrame(updateStage);*/
     };
 
 

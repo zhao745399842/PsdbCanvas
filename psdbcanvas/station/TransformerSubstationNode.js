@@ -17,7 +17,7 @@ this.PsdbCanvas = this.PsdbCanvas||{};
     "use strict";
 
 
-    function TransformerSubstationNode(){
+    function TransformerSubstationNode(circleNum,fillColor){
         var me=this;
 
         me.StationNode_constructor();
@@ -25,43 +25,46 @@ this.PsdbCanvas = this.PsdbCanvas||{};
          * 设置填充色
          * @type {null}
          */
-        me.fillColor="#B3EE3A";
+        me.fillColor=fillColor||"#FFFFFF";
+        //me.fillColor="#7CFC00";
         /**
          * 厂站图形圆圈的个数
          * @type {number}
          */
-        me.circleNum = 3;
+        me.circleNum = circleNum||3;
+        /**
+         * 绘制颜色
+         */
+        me.strokeColor="#363636";//363636
     }
 
 
     //指定类的继承关系
     var p = createjs.extend(TransformerSubstationNode, PsdbCanvas.StationNode);
-
     /**
      * 绘制图形
      */
-    p.drawNode=function(){
+    p.drawNodeGraphics=function(shape){
     	var me=this,
-	        shape= new PsdbCanvas.PsdbShape(me).set({cursor:me.cursor}),
-	        x=me.x-me.offset.x-me.width/2,
-	        y=me.y-me.offset.y-me.height/ 2,
-	        image=me.image;
+	        x=0-me.width/2,
+	        y=0-me.height/ 2;
 	    if(me.fillColor){
-	        shape.graphics.beginFill(me.fillColor);
+	    	if(me.disabled){
+	    		 shape.graphics.beginFill("#cccccc");
+	    	}else{
+	    		 shape.graphics.beginFill(me.fillColor);	 
+	    	}
 	    }
-	    var c= new PsdbCanvas.PsdbContainer();
 	    var r=me.width/2;
 	    shape.graphics.drawCircle(x+r,y+r,r);
 	    shape.graphics.endFill();
 	    for(var i=1;i<=me.circleNum;i++){
-	        shape.graphics.beginStroke("#363636");
+	        shape.graphics.beginStroke(me.strokeColor);
 	        shape.graphics.drawCircle(x+r,y+r,r*(i/me.circleNum));
 	        shape.graphics.endStroke();
 	    }
-	    c.addChild(shape);
-	    return c;
     };
-
+    
 
     //添加前缀创，创建父类的构造函数Stage_constructor
     PsdbCanvas.TransformerSubstationNode = createjs.promote(TransformerSubstationNode, "StationNode");
