@@ -1,4 +1,5 @@
 /**
+ * 创建直流线路继承自PsdbCanvas.BaseLine对象
  * Created by zw on 2015/8/6.
  */
 
