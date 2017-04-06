@@ -14,71 +14,39 @@ this.PsdbCanvas = this.PsdbCanvas||{};
 
     function AcLine(text,dashedPattern){
 
-        this.PsdbLine_constructor();
+        this.BaseLine_constructor();
 
-       /* this.nodeA=nodeA;
-        this.nodeB=nodeB;*/
-        /**
-         * 厂站属性
-         */
-        this.lineObje  = {
-        	 lineId  : "",
-        	 lname   : ""
-        };
+       
+	    /**
+	     * 线类型
+	     */
+	    this.typp ="AC";
+	    this.defaultStrokeColor='#0b56e0';
         /**
          * 交流初始默认颜色
          */
-        this.strokeColor = '#0b56e0';
-        this.modified =null;
+        this.strokeColor = this.defaultStrokeColor;
 
-        this.initAcLine();
 
     }
 
     //指定类的继承关系
-    var p = createjs.extend(AcLine, PsdbCanvas.PsdbLine);
-
+    var p = createjs.extend(AcLine, PsdbCanvas.BaseLine);
     /**
-     * 初始化连线
+     * 设置线路是否为在运行状态：inservice的值为T:表示在运行（样式为默认样式）
+     * color为不可用状态的线条颜色
      */
-    p.initAcLine=function(){
-        var me=this;
-        //连接标记，用于标记当前连线连接的节点
+    p.setInservice = function(inservice,color){
+    	var me=this;
+    	if(inservice&&inservice=='T'){
+    		me.useDefaultStrokeColor();
+    		me.setDashedPattern(false);
+    	}else{
+    		me.setStrokColor(color?color:'#696969');
+        	me.setDashedPattern(true);
+    	}
+    	me.inservice=inservice;
     };
-    /**
-     * 更新station厂站属性
-     */
-    p.updateline = function(obj){
-    	var me=this,
-    	    line=me.lineObje;
-    	PsdbCanvas.apply(line,obj);
-    };
-    
-    /**
-     * 获取厂站属性
-     */
-    p.get= function(name){
-        return this.lineObje[name];
-    };
-    /**
-     * 设置厂站属性
-     */
-    p.set = function(name, value){
-        /*var encode = Ext.isPrimitive(value) ? String : Ext.encode;
-        if(encode(this.lineObje[name]) == encode(value)) {
-            return;
-        }   */     
-        this.dirty = true;
-        if(!this.modified){
-            this.modified = {};
-        }
-        if(this.modified[name] === undefined){
-            this.modified[name] = this.data[name];
-        }
-        this.acline[name] = value;
-    },
-
-
     //添加前缀创，创建父类的构造函数Stage_constructor
-    PsdbCanvas.AcLine = createjs.promote(AcLine, "PsdbLine");
+    PsdbCanvas.AcLine = createjs.promote(AcLine, "BaseLine");
 })();
