@@ -1,6 +1,7 @@
 
  (function(){
    function LinuxTest(){
-      alert(”测试linux下是否成功。“);
+	   //修改成功
+      alert("测试linux下是否成功。");
    }
  })();
